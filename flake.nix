@@ -12,10 +12,9 @@
         pname = "mpv-launcher";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-        CGO_ENABLED = "1";
+        vendorHash = "sha256-Kqj/VZFxIs2ADWxY1JBipQFNcO/pbTmUsRpPs9umexM=";
         nativeBuildInputs = [ pkgs.pkg-config ];
-        buildInputs = [ pkgs.ffmpeg_7 ];
+        buildInputs = [ pkgs.ffmpeg ];
       };
 
       devShells.${system}.default = pkgs.mkShell {
@@ -25,7 +24,7 @@
           delve
           go-tools
           pkg-config
-          ffmpeg_7
+          ffmpeg
         ];
       };
     };
