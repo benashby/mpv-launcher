@@ -25,7 +25,8 @@ type PlaylistOptions struct {
 	SubtitleLanguage string // Preferred subtitle language (e.g., "eng", "fre")
 
 	// Playback options
-	Fullscreen bool // Start in fullscreen mode
+	Fullscreen bool   // Start in fullscreen mode
+	ScreenName string // Hyprland wl_output name; sets --fs --fs-screen-name=<name>
 }
 
 // NewMPVPlayer creates a new MPV player instance
@@ -118,15 +119,17 @@ func (p *MPVPlayer) Stop() error {
 // PlaylistWithPerFileTracks launches MPV with different tracks per file
 // Uses MPV's --{ and --} for per-file options:
 // mpv --{ --aid=1 --sid=1 file1.mkv --} --{ --aid=2 --sid=no file2.mkv --}
-func (p *MPVPlayer) PlaylistWithPerFileTracks(files []playlist.FilePlayback, fullscreen bool) error {
+func (p *MPVPlayer) PlaylistWithPerFileTracks(files []playlist.FilePlayback, opts PlaylistOptions) error {
 	if len(files) == 0 {
 		return fmt.Errorf("playlist is empty")
 	}
 
 	args := []string{}
 
-	// Add fullscreen at the start (global option)
-	if fullscreen {
+	// Monitor targeting implies fullscreen on that output; plain fullscreen is a fallback.
+	if opts.ScreenName != "" {
+		args = append(args, "--fs", "--fs-screen-name="+opts.ScreenName)
+	} else if opts.Fullscreen {
 		args = append(args, "--fs")
 	}
 

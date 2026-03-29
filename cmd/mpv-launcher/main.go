@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"mpv-launcher/internal/episode"
+	"mpv-launcher/internal/hyprland"
 	"mpv-launcher/internal/player"
 	"mpv-launcher/internal/playlist"
 	"mpv-launcher/internal/priority"
@@ -77,6 +78,39 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Step 3.5: Monitor selection (Hyprland only)
+	playOpts := player.PlaylistOptions{}
+
+	if hyprland.IsAvailable() {
+		monitors, err := hyprland.GetMonitors()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not query Hyprland monitors: %v\n", err)
+		} else {
+			items := make([]string, 1+len(monitors))
+			items[0] = "Normal window"
+			for i, m := range monitors {
+				label := fmt.Sprintf("%s - %dx%d @ %.0fHz", m.Name, m.Width, m.Height, m.RefreshRate)
+				if m.Focused {
+					label += " [focused]"
+				}
+				items[i+1] = label
+			}
+			fmt.Println()
+			choice, err := ui.CursorSelect("Select monitor:", items)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error in monitor selector: %v\n", err)
+				os.Exit(1)
+			}
+			if choice == -1 {
+				fmt.Println("Selection canceled")
+				os.Exit(0)
+			}
+			if choice > 0 {
+				playOpts.ScreenName = monitors[choice-1].Name
+			}
+		}
+	}
+
 	// Step 4: Get default permutations and show priority UI
 	perms := priority.DefaultPermutations()
 
@@ -127,7 +161,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := mpvPlayer.PlaylistWithPerFileTracks(playbackList, false); err != nil {
+	if err := mpvPlayer.PlaylistWithPerFileTracks(playbackList, playOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "Error starting playback: %v\n", err)
 		os.Exit(1)
 	}
