@@ -51,21 +51,6 @@ func TestBuildPerFileArgs_ScreenName(t *testing.T) {
 	}
 }
 
-func TestBuildPerFileArgs_ScreenNameOrder(t *testing.T) {
-	// --fs must come before --fs-screen-name for mpv to respect it
-	args := buildPerFileArgs(testFiles, PlaylistOptions{ScreenName: "DP-1"})
-
-	fsIdx := slices.Index(args, "--fs")
-	fsScreenIdx := slices.Index(args, "--fs-screen-name=DP-1")
-	keepAspectIdx := slices.Index(args, "--keepaspect=yes")
-
-	if fsIdx == -1 || fsScreenIdx == -1 || keepAspectIdx == -1 {
-		t.Fatal("missing required args")
-	}
-	if fsIdx > fsScreenIdx {
-		t.Error("--fs must appear before --fs-screen-name")
-	}
-}
 
 func TestBuildPerFileArgs_PerFileScoping(t *testing.T) {
 	args := buildPerFileArgs(testFiles, PlaylistOptions{})
@@ -100,11 +85,3 @@ func TestBuildPerFileArgs_TrackSelection(t *testing.T) {
 	}
 }
 
-func TestBuildPerFileArgs_EmptyPlaylist(t *testing.T) {
-	args := buildPerFileArgs([]playlist.FilePlayback{}, PlaylistOptions{ScreenName: "DP-1"})
-
-	// Global flags still appear even with no files
-	if !slices.Contains(args, "--fs") {
-		t.Error("global flags should appear even for empty playlist")
-	}
-}

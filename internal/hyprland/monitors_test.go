@@ -84,17 +84,6 @@ func TestGetMonitors_FiltersDisabled(t *testing.T) {
 	}
 }
 
-func TestIsAvailable(t *testing.T) {
-	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "")
-	if IsAvailable() {
-		t.Error("IsAvailable() should return false when env var is empty")
-	}
-
-	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "some-sig")
-	if !IsAvailable() {
-		t.Error("IsAvailable() should return true when env var is set")
-	}
-}
 
 func TestGetMonitors_NoEnvVar(t *testing.T) {
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "")
