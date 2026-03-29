@@ -116,19 +116,15 @@ func (p *MPVPlayer) Stop() error {
 	return nil
 }
 
-// PlaylistWithPerFileTracks launches MPV with different tracks per file
-// Uses MPV's --{ and --} for per-file options:
-// mpv --{ --aid=1 --sid=1 file1.mkv --} --{ --aid=2 --sid=no file2.mkv --}
-func (p *MPVPlayer) PlaylistWithPerFileTracks(files []playlist.FilePlayback, opts PlaylistOptions) error {
-	if len(files) == 0 {
-		return fmt.Errorf("playlist is empty")
-	}
-
+// buildPerFileArgs constructs the mpv argument list for a per-file playlist.
+// Exported as an internal helper so it can be tested without launching a process.
+func buildPerFileArgs(files []playlist.FilePlayback, opts PlaylistOptions) []string {
 	args := []string{}
 
-	// Monitor targeting implies fullscreen on that output; plain fullscreen is a fallback.
+	// Monitor targeting: fullscreen on a specific output, aspect ratio always preserved.
+	// Plain fullscreen is a fallback when no monitor is named.
 	if opts.ScreenName != "" {
-		args = append(args, "--fs", "--fs-screen-name="+opts.ScreenName)
+		args = append(args, "--fs", "--fs-screen-name="+opts.ScreenName, "--keepaspect=yes")
 	} else if opts.Fullscreen {
 		args = append(args, "--fs")
 	}
@@ -149,13 +145,23 @@ func (p *MPVPlayer) PlaylistWithPerFileTracks(files []playlist.FilePlayback, opt
 			args = append(args, "--sid="+strconv.Itoa(file.SubtitleTrack))
 		}
 
-		// Add the file
 		args = append(args, file.Filename)
-
 		args = append(args, "--}")
 	}
 
-	// Create and start MPV command
+	return args
+}
+
+// PlaylistWithPerFileTracks launches MPV with different tracks per file.
+// Uses MPV's --{ and --} for per-file options:
+// mpv --{ --aid=1 --sid=1 file1.mkv --} --{ --aid=2 --sid=no file2.mkv --}
+func (p *MPVPlayer) PlaylistWithPerFileTracks(files []playlist.FilePlayback, opts PlaylistOptions) error {
+	if len(files) == 0 {
+		return fmt.Errorf("playlist is empty")
+	}
+
+	args := buildPerFileArgs(files, opts)
+
 	p.cmd = exec.Command("mpv", args...)
 	p.cmd.Stdout = os.Stdout
 	p.cmd.Stderr = os.Stderr
