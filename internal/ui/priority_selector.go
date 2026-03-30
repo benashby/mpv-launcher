@@ -3,8 +3,6 @@ package ui
 import (
 	"fmt"
 	"strings"
-
-	"github.com/eiannone/keyboard"
 )
 
 // PrioritySelector displays and manages an interactive priority list
@@ -31,40 +29,37 @@ func NewPrioritySelector(items []string) *PrioritySelector {
 // Run displays the UI and returns the final priority order (indices into original items)
 // Returns nil if the user cancels (q)
 func (s *PrioritySelector) Run() ([]int, error) {
-	if err := keyboard.Open(); err != nil {
-		return nil, fmt.Errorf("failed to open keyboard: %w", err)
+	rr, err := newRawReader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to set raw mode: %w", err)
 	}
-	defer keyboard.Close()
+	defer rr.close()
 
 	s.render()
 
 	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read key: %w", err)
-		}
+		ch, key := rr.readKey()
 
 		switch {
-		case key == keyboard.KeyEnter:
-			// Clear the display and return
+		case key == rawKeyEnter:
 			s.clearDisplay()
 			return s.order, nil
 
-		case char == 'q' || key == keyboard.KeyEsc:
+		case ch == 'q' || key == rawKeyEscape:
 			s.clearDisplay()
 			s.canceled = true
 			return nil, nil
 
-		case char == 'j' || key == keyboard.KeyArrowDown:
+		case ch == 'j' || key == rawKeyDown:
 			s.moveCursorDown()
 
-		case char == 'k' || key == keyboard.KeyArrowUp:
+		case ch == 'k' || key == rawKeyUp:
 			s.moveCursorUp()
 
-		case char == 'J':
+		case ch == 'J':
 			s.demoteItem()
 
-		case char == 'K':
+		case ch == 'K':
 			s.promoteItem()
 		}
 
@@ -143,8 +138,8 @@ func (s *PrioritySelector) GetLabelsInOrder() []string {
 	return result
 }
 
-// SimpleSelect provides a simple numbered selection without reordering
-// Returns the selected index (0-based) or -1 if canceled
+// SimpleSelect provides a simple numbered selection without reordering.
+// Returns the selected index (0-based) or -1 if canceled.
 func SimpleSelect(prompt string, items []string) (int, error) {
 	fmt.Println(prompt)
 	for i, item := range items {
@@ -152,34 +147,37 @@ func SimpleSelect(prompt string, items []string) (int, error) {
 	}
 	fmt.Print("\nSelect option (1-", len(items), ", q to quit): ")
 
-	if err := keyboard.Open(); err != nil {
-		return -1, fmt.Errorf("failed to open keyboard: %w", err)
+	rr, err := newRawReader()
+	if err != nil {
+		return -1, fmt.Errorf("failed to set raw mode: %w", err)
 	}
-	defer keyboard.Close()
+	defer rr.close()
 
 	var input strings.Builder
 	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			return -1, err
-		}
+		ch, key := rr.readKey()
 
-		if key == keyboard.KeyEnter {
+		switch {
+		case key == rawKeyEnter:
 			fmt.Println()
-			break
-		}
+			var choice int
+			if _, err := fmt.Sscanf(input.String(), "%d", &choice); err != nil {
+				return -1, fmt.Errorf("invalid input")
+			}
+			if choice < 1 || choice > len(items) {
+				return -1, fmt.Errorf("selection out of range")
+			}
+			return choice - 1, nil
 
-		if char == 'q' || key == keyboard.KeyEsc {
+		case ch == 'q' || key == rawKeyEscape:
 			fmt.Println()
 			return -1, nil
-		}
 
-		if char >= '0' && char <= '9' {
-			input.WriteRune(char)
-			fmt.Print(string(char))
-		}
+		case ch >= '0' && ch <= '9':
+			input.WriteRune(ch)
+			fmt.Print(string(ch))
 
-		if key == keyboard.KeyBackspace || key == keyboard.KeyBackspace2 {
+		case ch == 127 || ch == 8: // backspace
 			s := input.String()
 			if len(s) > 0 {
 				input.Reset()
@@ -188,15 +186,4 @@ func SimpleSelect(prompt string, items []string) (int, error) {
 			}
 		}
 	}
-
-	var choice int
-	if _, err := fmt.Sscanf(input.String(), "%d", &choice); err != nil {
-		return -1, fmt.Errorf("invalid input")
-	}
-
-	if choice < 1 || choice > len(items) {
-		return -1, fmt.Errorf("selection out of range")
-	}
-
-	return choice - 1, nil
 }

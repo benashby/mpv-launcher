@@ -4,10 +4,8 @@ go 1.25.5
 
 require (
 	github.com/asticode/go-astiav v0.40.0
-	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
+	golang.org/x/sys v0.42.0
+	golang.org/x/term v0.41.0
 )
 
-require (
-	github.com/asticode/go-astikit v0.42.0 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
-)
+require github.com/asticode/go-astikit v0.42.0 // indirect

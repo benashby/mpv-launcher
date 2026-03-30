@@ -2,24 +2,27 @@ package ui
 
 import (
 	"fmt"
-
-	"github.com/eiannone/keyboard"
 )
 
 // CursorSelect presents a cursor-navigable list and returns the selected index (0-based).
-// Returns -1 if the user cancels (q).
-// Controls: j/↓ move down, k/↑ move up, Enter confirm, 1-9 jump and confirm, q cancel.
+// Returns -1 if the user cancels (q or Esc).
+// Controls: j/↓ move down, k/↑ move up, Enter confirm, 1-9 jump and confirm, q/Esc cancel.
 func CursorSelect(prompt string, items []string) (int, error) {
 	if len(items) == 0 {
 		return -1, fmt.Errorf("no items to select")
 	}
+
+	rr, err := newRawReader()
+	if err != nil {
+		return -1, fmt.Errorf("failed to set raw mode: %w", err)
+	}
+	defer rr.close()
 
 	cursor := 0
 	firstRender := true
 
 	render := func() {
 		if !firstRender {
-			// Clear previous render: header + blank + items + blank = len(items) + 3 lines
 			lines := len(items) + 3
 			for i := 0; i < lines; i++ {
 				fmt.Print("\033[A\033[K")
@@ -39,38 +42,30 @@ func CursorSelect(prompt string, items []string) (int, error) {
 		fmt.Println()
 	}
 
-	if err := keyboard.Open(); err != nil {
-		return -1, fmt.Errorf("failed to open keyboard: %w", err)
-	}
-	defer keyboard.Close()
-
 	render()
 
 	for {
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			return -1, fmt.Errorf("failed to read key: %w", err)
-		}
+		ch, key := rr.readKey()
 
 		switch {
-		case key == keyboard.KeyEnter:
+		case key == rawKeyEnter:
 			return cursor, nil
 
-		case char == 'q':
+		case ch == 'q' || key == rawKeyEscape:
 			return -1, nil
 
-		case char == 'j' || key == keyboard.KeyArrowDown:
+		case ch == 'j' || key == rawKeyDown:
 			if cursor < len(items)-1 {
 				cursor++
 			}
 
-		case char == 'k' || key == keyboard.KeyArrowUp:
+		case ch == 'k' || key == rawKeyUp:
 			if cursor > 0 {
 				cursor--
 			}
 
-		case char >= '1' && char <= '9':
-			idx := int(char-'1')
+		case ch >= '1' && ch <= '9':
+			idx := int(ch - '1')
 			if idx < len(items) {
 				return idx, nil
 			}
