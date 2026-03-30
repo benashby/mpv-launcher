@@ -3,13 +3,14 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // PrioritySelector displays and manages an interactive priority list
 type PrioritySelector struct {
 	items    []string
 	order    []int // indices into items representing current order
-	cursor   int
 	canceled bool
 }
 
@@ -19,114 +20,29 @@ func NewPrioritySelector(items []string) *PrioritySelector {
 	for i := range items {
 		order[i] = i
 	}
-	return &PrioritySelector{
-		items:  items,
-		order:  order,
-		cursor: 0,
-	}
+	return &PrioritySelector{items: items, order: order}
 }
 
-// Run displays the UI and returns the final priority order (indices into original items)
-// Returns nil if the user cancels (q)
+// Run displays the UI and returns the final priority order (indices into original items).
+// Returns nil if the user cancels (q or Esc).
 func (s *PrioritySelector) Run() ([]int, error) {
-	rr, err := newRawReader()
+	p := tea.NewProgram(newPriorityModel(s.items, s.order))
+	result, err := p.Run()
 	if err != nil {
-		return nil, fmt.Errorf("failed to set raw mode: %w", err)
+		return nil, err
 	}
-	defer rr.close()
-
-	s.render()
-
-	for {
-		ch, key := rr.readKey()
-
-		switch {
-		case key == rawKeyEnter:
-			s.clearDisplay()
-			return s.order, nil
-
-		case ch == 'q' || key == rawKeyEscape:
-			s.clearDisplay()
-			s.canceled = true
-			return nil, nil
-
-		case ch == 'j' || key == rawKeyDown:
-			s.moveCursorDown()
-
-		case ch == 'k' || key == rawKeyUp:
-			s.moveCursorUp()
-
-		case ch == 'J':
-			s.demoteItem()
-
-		case ch == 'K':
-			s.promoteItem()
-		}
-
-		s.render()
+	m := result.(priorityModel)
+	if m.canceled {
+		s.canceled = true
+		return nil, nil
 	}
+	s.order = m.order
+	return s.order, nil
 }
 
 // Canceled returns true if the user canceled the selection
 func (s *PrioritySelector) Canceled() bool {
 	return s.canceled
-}
-
-func (s *PrioritySelector) moveCursorDown() {
-	if s.cursor < len(s.order)-1 {
-		s.cursor++
-	}
-}
-
-func (s *PrioritySelector) moveCursorUp() {
-	if s.cursor > 0 {
-		s.cursor--
-	}
-}
-
-func (s *PrioritySelector) demoteItem() {
-	if s.cursor < len(s.order)-1 {
-		// Swap current with next
-		s.order[s.cursor], s.order[s.cursor+1] = s.order[s.cursor+1], s.order[s.cursor]
-		s.cursor++
-	}
-}
-
-func (s *PrioritySelector) promoteItem() {
-	if s.cursor > 0 {
-		// Swap current with previous
-		s.order[s.cursor], s.order[s.cursor-1] = s.order[s.cursor-1], s.order[s.cursor]
-		s.cursor--
-	}
-}
-
-func (s *PrioritySelector) render() {
-	// Move cursor up to overwrite previous render
-	// First render: just print. Subsequent: clear and reprint
-	s.clearDisplay()
-
-	fmt.Println("Set playback priority (j/k move, J/K reorder, Enter confirm, q quit):")
-	fmt.Println()
-
-	for i, idx := range s.order {
-		prefix := "  "
-		suffix := ""
-		if i == s.cursor {
-			prefix = "> "
-			suffix = " <"
-		}
-		fmt.Printf("%s%d. %s%s\n", prefix, i+1, s.items[idx], suffix)
-	}
-	fmt.Println()
-}
-
-func (s *PrioritySelector) clearDisplay() {
-	// Move cursor up and clear lines
-	// Total lines: 1 (header) + 1 (blank) + len(items) + 1 (blank) = len(items) + 3
-	lines := len(s.order) + 3
-	for i := 0; i < lines; i++ {
-		fmt.Print("\033[A\033[K") // Move up and clear line
-	}
 }
 
 // GetLabelsInOrder returns the item labels in priority order
@@ -138,52 +54,75 @@ func (s *PrioritySelector) GetLabelsInOrder() []string {
 	return result
 }
 
-// SimpleSelect provides a simple numbered selection without reordering.
-// Returns the selected index (0-based) or -1 if canceled.
-func SimpleSelect(prompt string, items []string) (int, error) {
-	fmt.Println(prompt)
-	for i, item := range items {
-		fmt.Printf("%d. %s\n", i+1, item)
-	}
-	fmt.Print("\nSelect option (1-", len(items), ", q to quit): ")
+// --- Bubble Tea model ---
 
-	rr, err := newRawReader()
-	if err != nil {
-		return -1, fmt.Errorf("failed to set raw mode: %w", err)
-	}
-	defer rr.close()
+type priorityModel struct {
+	items    []string
+	order    []int
+	cursor   int
+	canceled bool
+	done     bool
+}
 
-	var input strings.Builder
-	for {
-		ch, key := rr.readKey()
+func newPriorityModel(items []string, order []int) priorityModel {
+	orderCopy := make([]int, len(order))
+	copy(orderCopy, order)
+	return priorityModel{items: items, order: orderCopy}
+}
 
-		switch {
-		case key == rawKeyEnter:
-			fmt.Println()
-			var choice int
-			if _, err := fmt.Sscanf(input.String(), "%d", &choice); err != nil {
-				return -1, fmt.Errorf("invalid input")
+func (m priorityModel) Init() tea.Cmd { return nil }
+
+func (m priorityModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			m.done = true
+			return m, tea.Quit
+		case "q", "esc":
+			m.canceled = true
+			m.done = true
+			return m, tea.Quit
+		case "j", "down":
+			if m.cursor < len(m.order)-1 {
+				m.cursor++
 			}
-			if choice < 1 || choice > len(items) {
-				return -1, fmt.Errorf("selection out of range")
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor--
 			}
-			return choice - 1, nil
-
-		case ch == 'q' || key == rawKeyEscape:
-			fmt.Println()
-			return -1, nil
-
-		case ch >= '0' && ch <= '9':
-			input.WriteRune(ch)
-			fmt.Print(string(ch))
-
-		case ch == 127 || ch == 8: // backspace
-			s := input.String()
-			if len(s) > 0 {
-				input.Reset()
-				input.WriteString(s[:len(s)-1])
-				fmt.Print("\b \b")
+		case "J":
+			if m.cursor < len(m.order)-1 {
+				m.order[m.cursor], m.order[m.cursor+1] = m.order[m.cursor+1], m.order[m.cursor]
+				m.cursor++
+			}
+		case "K":
+			if m.cursor > 0 {
+				m.order[m.cursor], m.order[m.cursor-1] = m.order[m.cursor-1], m.order[m.cursor]
+				m.cursor--
 			}
 		}
 	}
+	return m, nil
+}
+
+func (m priorityModel) View() string {
+	var b strings.Builder
+	b.WriteString("Set playback priority (j/k move, J/K reorder, Enter confirm, q quit):\n\n")
+	for i, idx := range m.order {
+		if i == m.cursor {
+			fmt.Fprintf(&b, "> %d. %s <\n", i+1, m.items[idx])
+		} else {
+			fmt.Fprintf(&b, "  %d. %s\n", i+1, m.items[idx])
+		}
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// SimpleSelect provides a simple numbered selection without reordering.
+// Returns the selected index (0-based) or -1 if canceled.
+// This is now an alias for CursorSelect.
+func SimpleSelect(prompt string, items []string) (int, error) {
+	return CursorSelect(prompt, items)
 }
