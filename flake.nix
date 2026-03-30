@@ -12,7 +12,7 @@
         pname = "mpv-launcher";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-Kqj/VZFxIs2ADWxY1JBipQFNcO/pbTmUsRpPs9umexM=";
+        vendorHash = "sha256-klqzjEZmcPC99UTRnDUFcZkh5jwpAC6/ubSxf4QxzjQ=";
         nativeBuildInputs = [ pkgs.pkg-config ];
         buildInputs = [ pkgs.ffmpeg ];
       };
