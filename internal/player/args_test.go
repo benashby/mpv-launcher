@@ -85,3 +85,92 @@ func TestBuildPerFileArgs_TrackSelection(t *testing.T) {
 	}
 }
 
+func TestBuildPerFileArgs_Profile(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{Profile: "anime"})
+
+	if !slices.Contains(args, "--profile=anime") {
+		t.Error("should include --profile=anime")
+	}
+}
+
+func TestBuildPerFileArgs_NoProfile(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{})
+
+	for _, a := range args {
+		if len(a) > 9 && a[:9] == "--profile" {
+			t.Errorf("no profile set but got %q", a)
+		}
+	}
+}
+
+func TestBuildPerFileArgs_NoDeband(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{NoDeband: true})
+
+	if !slices.Contains(args, "--deband=no") {
+		t.Error("NoDeband should include --deband=no")
+	}
+}
+
+func TestBuildPerFileArgs_DeBandDefault(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{})
+
+	if slices.Contains(args, "--deband=no") {
+		t.Error("deband should not be overridden when NoDeband is false")
+	}
+}
+
+func TestBuildPerFileArgs_HwdecMode(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{HwdecMode: "vaapi"})
+
+	if !slices.Contains(args, "--hwdec=vaapi") {
+		t.Error("should include --hwdec=vaapi")
+	}
+}
+
+func TestBuildPerFileArgs_HwdecModeEmpty(t *testing.T) {
+	args := buildPerFileArgs(testFiles, PlaylistOptions{})
+
+	for _, a := range args {
+		if len(a) > 7 && a[:7] == "--hwdec" {
+			t.Errorf("no hwdec set but got %q", a)
+		}
+	}
+}
+
+func TestBuildPerFileArgs_IPCSocket(t *testing.T) {
+	sock := "/run/user/1000/mpv-launcher.sock"
+	args := buildPerFileArgs(testFiles, PlaylistOptions{IPCSocket: sock})
+
+	if !slices.Contains(args, "--input-ipc-server="+sock) {
+		t.Error("should include --input-ipc-server with socket path")
+	}
+}
+
+func TestBuildPerFileArgs_GlobalOptsBeforePerFile(t *testing.T) {
+	// Global options must appear before the first --{ so mpv applies them session-wide.
+	args := buildPerFileArgs(testFiles, PlaylistOptions{
+		Profile:   "anime",
+		NoDeband:  true,
+		HwdecMode: "vaapi",
+		IPCSocket: "/run/user/1000/mpv-launcher.sock",
+	})
+
+	firstBrace := -1
+	for i, a := range args {
+		if a == "--{" {
+			firstBrace = i
+			break
+		}
+	}
+	if firstBrace < 0 {
+		t.Fatal("no --{ found in args")
+	}
+
+	globalArgs := args[:firstBrace]
+	for _, want := range []string{"--profile=anime", "--deband=no", "--hwdec=vaapi", "--input-ipc-server=/run/user/1000/mpv-launcher.sock"} {
+		if !slices.Contains(globalArgs, want) {
+			t.Errorf("global option %q should appear before first --{", want)
+		}
+	}
+}
+

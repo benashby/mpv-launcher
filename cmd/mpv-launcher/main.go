@@ -17,12 +17,20 @@ import (
 	"mpv-launcher/internal/ui"
 )
 
+// ipcSocketPath returns the canonical IPC socket path for this user.
+func ipcSocketPath() string {
+	return fmt.Sprintf("/run/user/%d/mpv-launcher.sock", os.Getuid())
+}
+
 const maxFiles = 100
 
 func main() {
 	// Parse command-line flags
 	dirPath := flag.String("dir", ".", "Directory to scan for videos (default: current directory)")
 	recursive := flag.Bool("r", false, "Recursively scan subdirectories")
+	profileFlag := flag.String("profile", "", "MPV profile to activate (e.g. anime, music)")
+	nodebandFlag := flag.Bool("nodeband", false, "Disable deband filter (overrides mpv.conf)")
+	hwdecFlag := flag.String("hwdec", "", "Hardware decode mode override (vaapi-copy, vaapi, no)")
 	flag.Parse()
 
 	// Step 1: Scan directory for video files
@@ -79,7 +87,12 @@ func main() {
 	}
 
 	// Step 3.5: Monitor selection (Hyprland only)
-	playOpts := player.PlaylistOptions{}
+	playOpts := player.PlaylistOptions{
+		Profile:   *profileFlag,
+		NoDeband:  *nodebandFlag,
+		HwdecMode: *hwdecFlag,
+		IPCSocket: ipcSocketPath(),
+	}
 
 	if hyprland.IsAvailable() {
 		monitors, err := hyprland.GetMonitors()
@@ -108,6 +121,24 @@ func main() {
 			if choice > 0 {
 				playOpts.ScreenName = monitors[choice-1].Name
 			}
+		}
+	}
+
+	// Step 3.6: Profile selection (skip if set via -profile flag)
+	if playOpts.Profile == "" {
+		profileItems := []string{"None", "anime", "music"}
+		fmt.Println()
+		profileChoice, err := ui.CursorSelect("Select profile:", profileItems)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error in profile selector: %v\n", err)
+			os.Exit(1)
+		}
+		if profileChoice == -1 {
+			fmt.Println("Selection canceled")
+			os.Exit(0)
+		}
+		if profileChoice > 0 {
+			playOpts.Profile = profileItems[profileChoice]
 		}
 	}
 

@@ -27,6 +27,18 @@ type PlaylistOptions struct {
 	// Playback options
 	Fullscreen bool   // Start in fullscreen mode
 	ScreenName string // Hyprland wl_output name; sets --fs --fs-screen-name=<name>
+
+	// mpv.conf named profile to activate (e.g. "anime", "music")
+	Profile string
+
+	// Pass --deband=no to override mpv.conf deband setting
+	NoDeband bool
+
+	// Hardware decode mode override; passed as --hwdec=<mode> when non-empty
+	HwdecMode string
+
+	// Unix socket path for mpv IPC; passed as --input-ipc-server=<path> when non-empty
+	IPCSocket string
 }
 
 // NewMPVPlayer creates a new MPV player instance
@@ -120,6 +132,20 @@ func (p *MPVPlayer) Stop() error {
 // Exported as an internal helper so it can be tested without launching a process.
 func buildPerFileArgs(files []playlist.FilePlayback, opts PlaylistOptions) []string {
 	args := []string{}
+
+	// Global options that apply to the whole session.
+	if opts.Profile != "" {
+		args = append(args, "--profile="+opts.Profile)
+	}
+	if opts.NoDeband {
+		args = append(args, "--deband=no")
+	}
+	if opts.HwdecMode != "" {
+		args = append(args, "--hwdec="+opts.HwdecMode)
+	}
+	if opts.IPCSocket != "" {
+		args = append(args, "--input-ipc-server="+opts.IPCSocket)
+	}
 
 	// Monitor targeting: fullscreen on a specific output, aspect ratio always preserved.
 	// Plain fullscreen is a fallback when no monitor is named.
