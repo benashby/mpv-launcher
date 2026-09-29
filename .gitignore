@@ -49,3 +49,9 @@ Desktop.ini
 *.tmp
 *.temp
 *.log
+
+# direnv: the cache, and the .envrc Home Manager links in from the Nix store
+# (nix-projects configs.nix). It is Nix's, not the repo's: it was committed as
+# a store symlink and shows as modified whenever that store path moves.
+.direnv/
+/.envrc
