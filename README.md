@@ -1,5 +1,11 @@
 # MPV Launcher
 
+> **This repository is archived.** mpv-launcher now lives in
+> [bingekit](https://github.com/benashby/bingekit/tree/main/mpv-launcher),
+> rewritten in Rust with the same flags. Its releases are tagged
+> `mpv-launcher/vX.Y.Z` there. With Nix:
+> `nix run github:benashby/bingekit#mpv-launcher`.
+
 A Go application that uses FFmpeg for video analysis and preprocessing, then launches MPV for playback.
 
 ## Features
